@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+/*
+  Custom design tokens — available as Tailwind utilities:
+    bg-pickle-green       text-pickle-green       border-pickle-green
+    hover:bg-pickle-green focus:ring-pickle-green  etc.
+*/
+@theme {
+  --color-pickle-green: #8cc63f;
+}

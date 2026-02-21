@@ -21,9 +21,17 @@ services:
       DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-pickleballdb}
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      JWT_SECRET: ${JWT_SECRET:-pickleball-jwt-dev-secret-key-changeme-in-prod!}
     depends_on:
       db:
         condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - app
 
 volumes:
   postgres_data:
