@@ -1,122 +1,176 @@
-# Pickleball Planner Backend
+# Pickleball Planner
 
-Spring Boot REST API for managing pickleball matches, with JWT authentication backed by PostgreSQL.
+Full-stack pickleball match tracker — Spring Boot API + React frontend, JWT-authenticated, containerised with Docker Compose.
+
+---
 
 ## Stack
 
-- Java 21 (Eclipse Temurin LTS)
-- Spring Boot 3.3.6
-- Spring Security 6 + JWT (jjwt 0.12.6)
-- Spring Data JPA + Hibernate
-- PostgreSQL 16
-- Maven 3.9
+### Backend
+| Layer | Technology |
+|-------|-----------|
+| Runtime | Java 21 (Eclipse Temurin LTS) |
+| Framework | Spring Boot 3.3.6 |
+| Security | Spring Security 6 + JWT (jjwt 0.12.6) |
+| Persistence | Spring Data JPA + Hibernate |
+| Database | PostgreSQL 16 |
+| Build | Maven 3.9 |
 
-## Project Structure
+### Frontend
+| Layer | Technology |
+|-------|-----------|
+| UI | React 19 |
+| Routing | React Router 7 |
+| Styling | Tailwind CSS 4 (Vite plugin, no config file) |
+| HTTP | Axios 1.13.5 (with JWT interceptor) |
+| Build tool | Vite 7 |
+
+---
+
+## Repository Structure
 
 ```
-src/main/java/com/pickleball/app/
-├── PickleballApplication.java
-├── controller/
-│   ├── AuthController.java          # POST /api/auth/register, /login
-│   └── MatchController.java         # GET, POST, PUT /api/matches
-├── dto/
-│   ├── SignupRequest.java
-│   ├── LoginRequest.java
-│   └── JwtResponse.java
-├── entity/
-│   ├── Match.java
-│   ├── Role.java                    # enum USER | ADMIN
-│   └── User.java                    # implements UserDetails
-├── repository/
-│   ├── MatchRepository.java
-│   └── UserRepository.java
-└── security/
-    ├── SecurityConfig.java          # SecurityFilterChain, BCrypt, AuthManager
-    ├── JwtUtils.java                # generate / validate tokens
-    ├── JwtFilter.java               # OncePerRequestFilter
-    └── UserDetailsServiceImpl.java
+pickleballapp/
+├── backend/                             # Spring Boot API
+│   ├── src/main/java/com/pickleball/app/
+│   │   ├── PickleballApplication.java
+│   │   ├── controller/
+│   │   │   ├── AuthController.java      # POST /api/auth/register, /login
+│   │   │   └── MatchController.java     # GET, POST, PUT /api/matches
+│   │   ├── dto/
+│   │   │   ├── SignupRequest.java
+│   │   │   ├── LoginRequest.java
+│   │   │   └── JwtResponse.java
+│   │   ├── entity/
+│   │   │   ├── Match.java
+│   │   │   ├── Role.java                # enum USER | ADMIN
+│   │   │   └── User.java               # implements UserDetails
+│   │   ├── repository/
+│   │   │   ├── MatchRepository.java
+│   │   │   └── UserRepository.java
+│   │   └── security/
+│   │       ├── SecurityConfig.java      # FilterChain, CORS, BCrypt, @EnableMethodSecurity
+│   │       ├── JwtUtils.java            # generate / validate tokens
+│   │       ├── JwtFilter.java           # OncePerRequestFilter
+│   │       └── UserDetailsServiceImpl.java
+│   ├── Dockerfile                       # Multi-stage Maven build → JRE 21 alpine
+│   ├── pom.xml
+│   └── .sdkmanrc                        # Pins java 21.0.5-tem
+│
+├── frontend/                            # React SPA
+│   ├── src/
+│   │   ├── api/
+│   │   │   └── axiosInstance.js         # Axios + JWT request/response interceptors
+│   │   ├── pages/
+│   │   │   ├── LoginPage.jsx
+│   │   │   ├── RegisterPage.jsx
+│   │   │   └── MatchDashboard.jsx
+│   │   ├── App.jsx                      # BrowserRouter + ProtectedRoute
+│   │   ├── main.jsx
+│   │   └── index.css                    # @import "tailwindcss" + @theme colors
+│   ├── Dockerfile                       # Multi-stage Node build → nginx alpine
+│   ├── nginx.conf                       # SPA fallback + /api proxy → app:8080
+│   ├── vite.config.js                   # Tailwind plugin + /api proxy for dev
+│   └── package.json
+│
+├── docker-compose.yml                   # db + app + frontend (all three services)
+├── .gitignore
+└── README.md
 ```
+
+---
 
 ## Environment Variables
 
-The app reads these at startup. Defaults work for local dev without Docker.
+### Backend
 
-| Variable             | Default                                         | Description                        |
-| -------------------- | ----------------------------------------------- | ---------------------------------- |
-| `DB_URL`             | `jdbc:postgresql://localhost:5432/pickleballdb` | JDBC connection URL                |
-| `DB_USER`            | `postgres`                                      | DB username                        |
-| `DB_PASSWORD`        | `postgres`                                      | DB password                        |
-| `JWT_SECRET`         | _(dev placeholder — see below)_                 | HMAC-SHA256 signing key (≥ 32 chars) |
-| `JWT_EXPIRATION_MS`  | `86400000`                                      | Token lifetime in ms (default 24 h) |
+| Variable            | Default                                         | Description                          |
+| ------------------- | ----------------------------------------------- | ------------------------------------ |
+| `DB_URL`            | `jdbc:postgresql://localhost:5432/pickleballdb` | JDBC connection URL                  |
+| `DB_USER`           | `postgres`                                      | DB username                          |
+| `DB_PASSWORD`       | `postgres`                                      | DB password                          |
+| `JWT_SECRET`        | _(dev placeholder)_                             | HMAC-SHA256 signing key (≥ 32 chars) |
+| `JWT_EXPIRATION_MS` | `86400000`                                      | Token lifetime in ms (default 24 h)  |
 
-> **Production:** always set `JWT_SECRET` to a strong random value before deploying.
-> Generate one with: `openssl rand -base64 32`
+> **Production:** set `JWT_SECRET` to a strong random value.
+> Generate one: `openssl rand -base64 32`
+
+### Frontend
+
+| Variable       | Default | Description                                              |
+| -------------- | ------- | -------------------------------------------------------- |
+| `VITE_API_URL` | _(empty)_ | API base URL. Empty = Vite proxy in dev, nginx proxy in Docker. Set to `https://api.yourdomain.com` only if serving frontend and backend from different origins. |
 
 ---
 
 ## Authentication Flow
 
 ```
-POST /api/auth/register  →  hash password (BCrypt) → save User → 201
-POST /api/auth/login     →  validate credentials   → return JWT
-GET  /api/matches        →  requires Authorization: Bearer <token>
+POST /api/auth/register  →  BCrypt hash → save User → 201
+POST /api/auth/login     →  authenticate → return JWT
+GET  /api/matches        →  JwtFilter validates Bearer token → allowed
+GET  /api/matches        →  no / bad token → 401
 ```
 
-All `/api/auth/**` endpoints are public. All other `/api/**` endpoints require a valid JWT.
+- All `/api/auth/**` endpoints are **public**.
+- All `/api/**` endpoints require a valid JWT (`SecurityConfig` + `@PreAuthorize`).
+- On login the frontend stores `token` and `email` in `localStorage`.
+- The Axios interceptor reads `localStorage.token` and attaches `Authorization: Bearer <token>` to every request automatically.
+- On a `401` response the interceptor clears storage and redirects to `/login`.
 
 ---
 
 ## Running Locally
 
-### Option A — Docker Compose (recommended)
-
-Starts the app and a PostgreSQL container together.
+### Option A — Docker Compose (all three services at once)
 
 ```bash
 docker compose up --build
 ```
 
-- First run compiles the app inside Docker (~2 min)
-- Postgres starts first; app waits until DB is healthy
-- App available at http://localhost:8080
+| Service    | URL                      | Notes                             |
+| ---------- | ------------------------ | --------------------------------- |
+| `frontend` | http://localhost         | nginx serves the React build      |
+| `app`      | http://localhost:8080    | Spring Boot API (direct access)   |
+| `db`       | localhost:5432 (internal)| Postgres — not exposed externally |
+
+Startup order: **db** (health-checked) → **app** → **frontend**
 
 ```bash
-docker compose down      # stop, keep DB data
-docker compose down -v   # stop and delete DB volume
+docker compose down       # stop, keep DB volume
+docker compose down -v    # stop + wipe DB volume
 ```
 
-### Option B — Maven (requires local PostgreSQL)
+---
 
-1. Make sure PostgreSQL is running on `localhost:5432` with a database named `pickleballdb`.
+### Option B — Dev servers (hot reload)
 
-2. Install Java 21 via SDKMAN (already configured in `.sdkmanrc`):
-
-```bash
-sdk env install   # installs java 21.0.5-tem if not present
-sdk env           # activates the version for this project
-```
-
-3. Run:
+**Terminal 1 — Backend:**
 
 ```bash
+cd backend
+sdk env          # activates java 21.0.5-tem via .sdkmanrc
 mvn spring-boot:run
 ```
 
-Override any variable inline if needed:
+**Terminal 2 — Frontend:**
 
 ```bash
-DB_PASSWORD=secret JWT_SECRET=my-strong-secret mvn spring-boot:run
+cd frontend
+npm run dev
 ```
+
+Open **http://localhost:5173**
+
+The Vite dev server proxies all `/api/*` requests to `http://localhost:8080`, so no CORS issues and no `VITE_API_URL` needed.
 
 ---
 
 ## API Reference
 
-### Auth endpoints (public)
+### Auth (public)
 
-#### POST /api/auth/register
-
-Creates a new user account.
+#### `POST /api/auth/register`
 
 ```bash
 curl -X POST http://localhost:8080/api/auth/register \
@@ -124,14 +178,12 @@ curl -X POST http://localhost:8080/api/auth/register \
   -d '{"email":"alice@example.com","password":"secret123"}'
 ```
 
-| Status | Meaning |
-|--------|---------|
-| `201`  | Registered successfully |
+| Status | Meaning              |
+| ------ | -------------------- |
+| `201`  | Registered           |
 | `409`  | Email already in use |
 
-#### POST /api/auth/login
-
-Authenticates and returns a JWT token.
+#### `POST /api/auth/login`
 
 ```bash
 curl -X POST http://localhost:8080/api/auth/login \
@@ -140,7 +192,6 @@ curl -X POST http://localhost:8080/api/auth/login \
 ```
 
 Response:
-
 ```json
 {
   "token": "eyJhbGciOiJIUzI1NiJ9...",
@@ -151,27 +202,20 @@ Response:
 
 ---
 
-### Match endpoints (require JWT)
+### Matches (require JWT)
 
-All requests below must include the header:
-
+All match endpoints require the header:
 ```
 Authorization: Bearer <token>
 ```
 
-#### GET /api/matches
-
-Returns all matches.
-
+#### `GET /api/matches`
 ```bash
 curl http://localhost:8080/api/matches \
   -H "Authorization: Bearer <token>"
 ```
 
-#### POST /api/matches
-
-Creates a new match.
-
+#### `POST /api/matches`
 ```bash
 curl -X POST http://localhost:8080/api/matches \
   -H "Content-Type: application/json" \
@@ -179,15 +223,11 @@ curl -X POST http://localhost:8080/api/matches \
   -d '{
     "playerOne": "Alice",
     "playerTwo": "Bob",
-    "score": "11-7",
-    "matchDate": "2026-02-19T14:00:00"
+    "matchDate": "2026-02-20T14:00:00"
   }'
 ```
 
-#### PUT /api/matches/{id}
-
-Updates the score of an existing match.
-
+#### `PUT /api/matches/{id}` — update score
 ```bash
 curl -X PUT http://localhost:8080/api/matches/1 \
   -H "Content-Type: application/json" \
@@ -199,73 +239,78 @@ Returns `404` if the match ID does not exist.
 
 ---
 
-## Docker
+## Frontend Pages
 
-### Build the image manually
+| Route        | Page              | Description                                      |
+| ------------ | ----------------- | ------------------------------------------------ |
+| `/login`     | `LoginPage`       | Email + password form, stores JWT on success     |
+| `/register`  | `RegisterPage`    | Email + password form, redirects to `/login`     |
+| `/dashboard` | `MatchDashboard`  | Protected — new match form + live match list     |
+| `*`          | —                 | Redirects to `/login`                            |
 
+`/dashboard` is wrapped in a `ProtectedRoute` — unauthenticated users are redirected to `/login`.
+
+---
+
+## Docker — Individual Builds
+
+**Backend:**
 ```bash
-docker build -t pickleballapp .
+docker build -t pickleball-app ./backend
 ```
 
-### Run with a separate Postgres container
-
+**Frontend:**
 ```bash
-docker network create pickleball-net
-
-docker run -d --name db --network pickleball-net \
-  -e POSTGRES_DB=pickleballdb \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  postgres:16-alpine
-
-docker run -d --name app --network pickleball-net \
-  -p 8080:8080 \
-  -e DB_URL=jdbc:postgresql://db:5432/pickleballdb \
-  -e DB_USER=postgres \
-  -e DB_PASSWORD=postgres \
-  -e JWT_SECRET=my-strong-secret-key \
-  pickleballapp
+docker build -t pickleball-frontend ./frontend
 ```
+
+The frontend nginx container proxies `/api/` to `http://app:8080` internally, identical to the Vite dev proxy.
 
 ---
 
 ## Deploying on Coolify
 
-### Option 1 — Docker Compose (self-contained)
+### Option 1 — Docker Compose (self-contained, recommended)
 
-1. Push this repo to GitHub/GitLab.
-2. In Coolify, create a new **Docker Compose** service and point it at the repo.
-3. Coolify will use `docker-compose.yml` to run both `app` and `db`.
-4. Set secrets in Coolify's **Environment Variables** UI:
+1. Push this repo to GitHub / GitLab.
+2. In Coolify create a **Docker Compose** service pointing at the repo.
+3. Coolify runs all three services (`db`, `app`, `frontend`) from `docker-compose.yml`.
+4. Set these in Coolify's **Environment Variables** UI:
 
-| Variable      | Value                  |
-| ------------- | ---------------------- |
-| `DB_PASSWORD` | a strong password      |
-| `DB_USER`     | `postgres` (or custom) |
-| `POSTGRES_DB` | `pickleballdb`         |
-| `JWT_SECRET`  | output of `openssl rand -base64 32` |
+| Variable      | Value                               |
+| ------------- | ----------------------------------- |
+| `DB_PASSWORD` | a strong password                   |
+| `DB_USER`     | `postgres` (or custom)              |
+| `POSTGRES_DB` | `pickleballdb`                      |
+| `JWT_SECRET`  | `openssl rand -base64 32`           |
 
-### Option 2 — Dockerfile + Coolify-managed PostgreSQL (recommended for production)
+### Option 2 — Separate services (Dockerfile per service)
 
-1. Add a **PostgreSQL** resource in Coolify and note the connection details.
-2. Create a new **Dockerfile** service pointing at the repo.
-3. Set environment variables:
+1. Add a **PostgreSQL** resource in Coolify; note the host and credentials.
+2. Deploy `backend/` as a **Dockerfile** service. Set:
 
-| Variable      | Value                                                   |
-| ------------- | ------------------------------------------------------- |
-| `DB_URL`      | `jdbc:postgresql://<coolify-db-host>:5432/pickleballdb` |
-| `DB_USER`     | your DB user                                            |
-| `DB_PASSWORD` | your DB password                                        |
-| `JWT_SECRET`  | output of `openssl rand -base64 32`                     |
+| Variable      | Value                                                    |
+| ------------- | -------------------------------------------------------- |
+| `DB_URL`      | `jdbc:postgresql://<coolify-db-host>:5432/pickleballdb`  |
+| `DB_USER`     | your DB user                                             |
+| `DB_PASSWORD` | your DB password                                         |
+| `JWT_SECRET`  | `openssl rand -base64 32`                                |
 
-This keeps the database lifecycle independent from app deployments.
+3. Deploy `frontend/` as a separate **Dockerfile** service. Set:
+
+| Variable       | Value                            |
+| -------------- | -------------------------------- |
+| `VITE_API_URL` | `https://your-backend-domain.com` |
+
+> With separate deployments the nginx proxy won't reach the backend by hostname. Set `VITE_API_URL` so the frontend calls the backend directly and CORS headers handle cross-origin requests.
 
 ---
 
 ## Java Version Management
 
-The project pins Java 21 via `.sdkmanrc`. With [SDKMAN](https://sdkman.io) installed:
+The backend pins Java 21 via `backend/.sdkmanrc`. With [SDKMAN](https://sdkman.io) installed:
 
 ```bash
-sdk env        # auto-switches to java 21.0.5-tem when entering the project dir
+cd backend
+sdk env        # auto-switches to java 21.0.5-tem
 ```
