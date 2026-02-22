@@ -130,7 +130,7 @@ docker compose up --build
 
 | Service    | URL                      | Notes                             |
 | ---------- | ------------------------ | --------------------------------- |
-| `frontend` | http://localhost         | nginx serves the React build      |
+| `frontend` | http://localhost:3000    | nginx serves the React build      |
 | `app`      | http://localhost:8080    | Spring Boot API (direct access)   |
 | `db`       | localhost:5432 (internal)| Postgres — not exposed externally |
 
