@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import MatchDashboard from "./pages/MatchDashboard";
+import ProfilePage from "./pages/ProfilePage";
 
 function ProtectedRoute({ children }) {
   return localStorage.getItem("token") ? (
@@ -22,6 +23,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <MatchDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
             </ProtectedRoute>
           }
         />

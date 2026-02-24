@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import api from "../api/axiosInstance";
 
 function formatDate(iso) {
@@ -158,6 +158,13 @@ export default function MatchDashboard() {
                 {email}
               </span>
             )}
+            <Link
+              to="/profile"
+              title="Account settings"
+              className="w-8 h-8 rounded-full bg-pickle-green flex items-center justify-center text-white text-sm font-bold hover:opacity-80 transition-opacity select-none"
+            >
+              {(email || "?").charAt(0).toUpperCase()}
+            </Link>
             <button
               onClick={handleLogout}
               className="text-sm px-3.5 py-1.5 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
