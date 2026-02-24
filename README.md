@@ -36,11 +36,15 @@ pickleballapp/
 │   │   ├── PickleballApplication.java
 │   │   ├── controller/
 │   │   │   ├── AuthController.java      # POST /api/auth/register, /login
-│   │   │   └── MatchController.java     # GET, POST, PUT /api/matches
+│   │   │   ├── MatchController.java     # GET, POST, PUT /api/matches
+│   │   │   └── UserController.java      # GET, PUT /api/user/profile, PUT /api/user/password
 │   │   ├── dto/
 │   │   │   ├── SignupRequest.java
 │   │   │   ├── LoginRequest.java
-│   │   │   └── JwtResponse.java
+│   │   │   ├── JwtResponse.java
+│   │   │   ├── UserProfileResponse.java
+│   │   │   ├── UpdateProfileRequest.java
+│   │   │   └── ChangePasswordRequest.java
 │   │   ├── entity/
 │   │   │   ├── Match.java
 │   │   │   ├── Role.java                # enum USER | ADMIN
@@ -64,7 +68,8 @@ pickleballapp/
 │   │   ├── pages/
 │   │   │   ├── LoginPage.jsx
 │   │   │   ├── RegisterPage.jsx
-│   │   │   └── MatchDashboard.jsx
+│   │   │   ├── MatchDashboard.jsx
+│   │   │   └── ProfilePage.jsx          # Account settings: profile + password change
 │   │   ├── App.jsx                      # BrowserRouter + ProtectedRoute
 │   │   ├── main.jsx
 │   │   └── index.css                    # @import "tailwindcss" + @theme colors
@@ -239,16 +244,66 @@ Returns `404` if the match ID does not exist.
 
 ---
 
+### User Profile (require JWT)
+
+All user endpoints require the header:
+```
+Authorization: Bearer <token>
+```
+
+#### `GET /api/user/profile`
+```bash
+curl http://localhost:8080/api/user/profile \
+  -H "Authorization: Bearer <token>"
+```
+
+Response:
+```json
+{
+  "id": 1,
+  "email": "alice@example.com",
+  "name": "Alice",
+  "photoUrl": "https://example.com/avatar.jpg",
+  "role": "USER"
+}
+```
+
+#### `PUT /api/user/profile` — update name and photo URL
+```bash
+curl -X PUT http://localhost:8080/api/user/profile \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{"name": "Alice", "photoUrl": "https://example.com/avatar.jpg"}'
+```
+
+Email cannot be changed. Returns the updated profile object.
+
+#### `PUT /api/user/password` — change password
+```bash
+curl -X PUT http://localhost:8080/api/user/password \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{"currentPassword": "oldpass", "newPassword": "newpass123"}'
+```
+
+| Status | Meaning                       |
+| ------ | ----------------------------- |
+| `200`  | Password changed              |
+| `400`  | Wrong current password / validation error |
+
+---
+
 ## Frontend Pages
 
-| Route        | Page              | Description                                      |
-| ------------ | ----------------- | ------------------------------------------------ |
-| `/login`     | `LoginPage`       | Email + password form, stores JWT on success     |
-| `/register`  | `RegisterPage`    | Email + password form, redirects to `/login`     |
-| `/dashboard` | `MatchDashboard`  | Protected — new match form + live match list     |
-| `*`          | —                 | Redirects to `/login`                            |
+| Route        | Page              | Description                                                  |
+| ------------ | ----------------- | ------------------------------------------------------------ |
+| `/login`     | `LoginPage`       | Email + password form, stores JWT on success                 |
+| `/register`  | `RegisterPage`    | Email + password form, redirects to `/login`                 |
+| `/dashboard` | `MatchDashboard`  | Protected — new match form + live match list                 |
+| `/profile`   | `ProfilePage`     | Protected — update name, photo URL; read-only email; change password |
+| `*`          | —                 | Redirects to `/login`                                        |
 
-`/dashboard` is wrapped in a `ProtectedRoute` — unauthenticated users are redirected to `/login`.
+`/dashboard` and `/profile` are wrapped in `ProtectedRoute` — unauthenticated users are redirected to `/login`.
 
 ---
 
