@@ -26,6 +26,12 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private Role role;
 
+    @Column
+    private String name;
+
+    @Column(name = "photo_url")
+    private String photoUrl;
+
     public User() {}
 
     public User(String email, String password, Role role) {
@@ -61,4 +67,8 @@ public class User implements UserDetails {
     public void setPassword(String password)  { this.password = password; }
     public Role getRole()                     { return role; }
     public void setRole(Role role)            { this.role = role; }
+    public String getName()                   { return name; }
+    public void setName(String name)          { this.name = name; }
+    public String getPhotoUrl()               { return photoUrl; }
+    public void setPhotoUrl(String photoUrl)  { this.photoUrl = photoUrl; }
 }
