@@ -3,6 +3,7 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import MatchDashboard from "./pages/MatchDashboard";
 import ProfilePage from "./pages/ProfilePage";
+import JoinSessionPage from "./pages/JoinSessionPage";
 
 function ProtectedRoute({ children }) {
   return localStorage.getItem("token") ? (
@@ -34,6 +35,9 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        {/* Public join page — no auth needed */}
+        <Route path="/join" element={<JoinSessionPage />} />
+        <Route path="/join/:code" element={<JoinSessionPage />} />
         {/* Redirect anything else to /login */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

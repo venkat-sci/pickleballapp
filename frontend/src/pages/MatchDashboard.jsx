@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { QRCodeSVG } from "qrcode.react";
 import api from "../api/axiosInstance";
 import CreateMatchForm from "./CreateMatchForm";
 
@@ -91,6 +92,20 @@ export default function MatchDashboard() {
   const [deletingGroup, setDeletingGroup] = useState(false);
   const [deleteGroupError, setDeleteGroupError] = useState("");
 
+  // Sessions
+  const [activeSession, setActiveSession] = useState(null);
+  const [sessionName, setSessionName] = useState("");
+  const [sessionLoading, setSessionLoading] = useState(false);
+  const [sessionError, setSessionError] = useState("");
+  const [showQR, setShowQR] = useState(false);
+  const [closingSession, setClosingSession] = useState(false);
+
+  // Guest player add
+  const [guestName, setGuestName] = useState("");
+  const [addingGuest, setAddingGuest] = useState(false);
+  const [addGuestError, setAddGuestError] = useState("");
+  const [addGuestSuccess, setAddGuestSuccess] = useState("");
+
   const fetchGroupMembers = useCallback(async (gId) => {
     if (!gId) {
       setGroupMembers([]);
@@ -116,6 +131,12 @@ export default function MatchDashboard() {
     fetchGroupMembers(groupId);
     setAddMemberError("");
     setAddMemberSuccess("");
+    // Reset guest/session state when group changes
+    setAddGuestError("");
+    setAddGuestSuccess("");
+    setActiveSession(null);
+    setShowQR(false);
+    setSessionError("");
   }, [groupId, fetchGroupMembers]);
 
   const fetchMyGroups = async (preferredGroupId) => {
@@ -347,6 +368,60 @@ export default function MatchDashboard() {
     }
   };
 
+  const handleCreateSession = async (e) => {
+    e.preventDefault();
+    if (!groupId) return;
+    const name = sessionName.trim() || selectedGroup?.name || "Court Session";
+    setSessionLoading(true);
+    setSessionError("");
+    try {
+      const { data } = await api.post("/api/sessions", {
+        name,
+        groupId: Number(groupId),
+      });
+      setActiveSession(data);
+      setSessionName("");
+      setShowQR(true);
+    } catch {
+      setSessionError("Could not create session. Try again.");
+    } finally {
+      setSessionLoading(false);
+    }
+  };
+
+  const handleCloseSession = async () => {
+    if (!activeSession) return;
+    setClosingSession(true);
+    try {
+      await api.put(`/api/sessions/${activeSession.code}/close`);
+      setActiveSession(null);
+      setShowQR(false);
+    } catch {
+      // ignore
+    } finally {
+      setClosingSession(false);
+    }
+  };
+
+  const handleAddGuest = async (e) => {
+    e.preventDefault();
+    const name = guestName.trim();
+    if (!name || !groupId) return;
+    setAddingGuest(true);
+    setAddGuestError("");
+    setAddGuestSuccess("");
+    try {
+      await api.post(`/api/groups/${groupId}/add-guest`, { displayName: name });
+      setGuestName("");
+      setAddGuestSuccess(`${name} added as a guest player!`);
+      await fetchGroupMembers(groupId);
+    } catch (err) {
+      setAddGuestError(err.response?.data?.message || "Could not add guest.");
+    } finally {
+      setAddingGuest(false);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("email");
@@ -503,6 +578,108 @@ export default function MatchDashboard() {
             )}
         </section>
 
+        {/* Session Panel — start a live session with a join code + QR */}
+        {hasGroup && (
+          <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-gray-800">
+                🏓 Live Session
+              </h2>
+              <span className="text-xs text-gray-400">
+                Share a code so players can join without registering
+              </span>
+            </div>
+
+            {!activeSession ? (
+              <form onSubmit={handleCreateSession} className="space-y-3">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    value={sessionName}
+                    onChange={(e) => setSessionName(e.target.value)}
+                    placeholder={
+                      selectedGroup?.name
+                        ? `e.g. ${selectedGroup.name}`
+                        : "e.g. Tuesday Night Courts"
+                    }
+                    className="flex-1 px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pickle-green focus:border-transparent transition"
+                  />
+                  <button
+                    type="submit"
+                    disabled={sessionLoading}
+                    className="px-4 py-2.5 text-sm font-semibold text-white rounded-xl bg-pickle-green hover:opacity-90 disabled:opacity-50 transition-opacity whitespace-nowrap"
+                  >
+                    {sessionLoading ? "Starting…" : "▶ Start Session"}
+                  </button>
+                </div>
+                {sessionError && (
+                  <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-3.5 py-2">
+                    {sessionError}
+                  </p>
+                )}
+              </form>
+            ) : (
+              <div className="space-y-4">
+                {/* Active session info */}
+                <div className="flex items-start justify-between gap-4 bg-green-50 border border-green-200 rounded-xl p-4">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-green-700 uppercase tracking-wide">
+                      🟢 Session Active
+                    </p>
+                    <p className="font-bold text-gray-800 text-lg">
+                      {activeSession.name}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Share this code:&nbsp;
+                      <span className="font-mono font-bold text-gray-800 tracking-widest text-base">
+                        {activeSession.code}
+                      </span>
+                    </p>
+                    <a
+                      href={`/join/${activeSession.code}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-pickle-green underline underline-offset-2"
+                    >
+                      🔗 Open join link
+                    </a>
+                  </div>
+                  <button
+                    onClick={() => setShowQR((v) => !v)}
+                    className="shrink-0 px-3 py-1.5 text-xs font-semibold border border-green-300 text-green-700 rounded-xl hover:bg-green-100 transition-colors"
+                  >
+                    {showQR ? "Hide QR" : "📷 Show QR"}
+                  </button>
+                </div>
+
+                {/* QR code */}
+                {showQR && (
+                  <div className="flex flex-col items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl">
+                    <QRCodeSVG
+                      value={`${window.location.origin}/join/${activeSession.code}`}
+                      size={180}
+                      bgColor="#ffffff"
+                      fgColor="#1a6b3a"
+                      level="M"
+                    />
+                    <p className="text-xs text-gray-400 text-center">
+                      Players scan this to join without registering
+                    </p>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleCloseSession}
+                  disabled={closingSession}
+                  className="text-sm text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 px-3.5 py-2 rounded-xl disabled:opacity-50 transition-colors"
+                >
+                  {closingSession ? "Closing…" : "🔴 End Session"}
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+
         {/* Step 2: Members */}
         {hasGroup && (
           <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-5">
@@ -612,6 +789,46 @@ export default function MatchDashboard() {
               )}
             </form>
 
+            {/* Add guest player (name only — no registration) */}
+            <form onSubmit={handleAddGuest} className="space-y-2">
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Add Guest Player{" "}
+                <span className="normal-case font-normal">
+                  (name only, no account needed)
+                </span>
+              </label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text"
+                  value={guestName}
+                  onChange={(e) => {
+                    setGuestName(e.target.value);
+                    if (addGuestError) setAddGuestError("");
+                    if (addGuestSuccess) setAddGuestSuccess("");
+                  }}
+                  placeholder="Guest's name…"
+                  className="w-full sm:w-80 px-3.5 py-2.5 border border-dashed border-gray-300 rounded-xl text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pickle-green focus:border-transparent transition bg-gray-50"
+                />
+                <button
+                  type="submit"
+                  disabled={addingGuest}
+                  className="px-4 py-2.5 text-sm font-semibold text-white rounded-xl bg-pickle-green hover:opacity-90 disabled:opacity-50 transition-opacity"
+                >
+                  {addingGuest ? "Adding…" : "+ Add Guest"}
+                </button>
+              </div>
+              {addGuestError && (
+                <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-3.5 py-2">
+                  {addGuestError}
+                </p>
+              )}
+              {addGuestSuccess && (
+                <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-3.5 py-2">
+                  {addGuestSuccess}
+                </p>
+              )}
+            </form>
+
             {/* Member list */}
             {membersLoading ? (
               <p className="text-sm text-gray-400 animate-pulse">
@@ -626,41 +843,56 @@ export default function MatchDashboard() {
               </div>
             ) : (
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {groupMembers.map((member) => (
-                  <li
-                    key={member.id}
-                    className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-pickle-green flex items-center justify-center text-white text-xs font-bold shrink-0 select-none">
-                      {(member.name || member.email).charAt(0).toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      {member.name && (
-                        <p className="text-sm font-medium text-gray-800 truncate">
-                          {member.name}
-                        </p>
-                      )}
-                      <p className="text-xs text-gray-400 truncate">
-                        {member.email}
-                      </p>
-                    </div>
-                    {(String(selectedGroup.createdById) === userId ||
-                      String(member.id) === userId) && (
-                      <button
-                        onClick={() => handleRemoveMember(member.id)}
-                        disabled={removingMemberId === member.id}
-                        title="Remove member"
-                        className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-40 transition-colors"
+                {groupMembers.map((member) => {
+                  const isGuest =
+                    member.guest ||
+                    (member.email || "").endsWith("@pickleball.local");
+                  return (
+                    <li
+                      key={member.id}
+                      className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5"
+                    >
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 select-none ${isGuest ? "bg-amber-400" : "bg-pickle-green"}`}
                       >
-                        {removingMemberId === member.id ? (
-                          <span className="text-xs animate-pulse">\u22ef</span>
-                        ) : (
-                          <span className="text-xs">\u2715</span>
+                        {(member.name || member.email).charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">
+                            {member.name || member.email}
+                          </p>
+                          {isGuest && (
+                            <span className="shrink-0 text-xs bg-amber-100 text-amber-700 font-semibold px-1.5 py-0.5 rounded-full">
+                              Guest
+                            </span>
+                          )}
+                        </div>
+                        {!isGuest && (
+                          <p className="text-xs text-gray-400 truncate">
+                            {member.email}
+                          </p>
                         )}
-                      </button>
-                    )}
-                  </li>
-                ))}
+                      </div>
+                      {(String(selectedGroup.createdById) === userId ||
+                        String(member.id) === userId ||
+                        isGuest) && (
+                        <button
+                          onClick={() => handleRemoveMember(member.id)}
+                          disabled={removingMemberId === member.id}
+                          title="Remove member"
+                          className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-40 transition-colors"
+                        >
+                          {removingMemberId === member.id ? (
+                            <span className="text-xs animate-pulse">⋯</span>
+                          ) : (
+                            <span className="text-xs">✕</span>
+                          )}
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
             {!hasEnoughMembers && groupMembers.length > 0 && (

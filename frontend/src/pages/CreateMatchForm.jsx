@@ -234,30 +234,35 @@ export default function CreateMatchForm({ groupId, onMatchCreated }) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-            Team 1 Score
-          </label>
-          <input
-            min={0}
-            type="number"
-            value={teamOneScore}
-            onChange={(event) => setTeamOneScore(event.target.value)}
-            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-pickle-green focus:border-transparent transition"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-            Team 2 Score
-          </label>
-          <input
-            min={0}
-            type="number"
-            value={teamTwoScore}
-            onChange={(event) => setTeamTwoScore(event.target.value)}
-            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-pickle-green focus:border-transparent transition"
-          />
-        </div>
+        {[
+          { label: "Team 1 Score", value: teamOneScore, set: setTeamOneScore },
+          { label: "Team 2 Score", value: teamTwoScore, set: setTeamTwoScore },
+        ].map(({ label, value, set }) => (
+          <div key={label}>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+              {label}
+            </label>
+            <div className="flex items-center gap-0 border border-gray-300 rounded-xl overflow-hidden w-fit">
+              <button
+                type="button"
+                onClick={() => set((v) => Math.max(0, Number(v) - 1))}
+                className="px-4 py-2.5 text-lg font-bold text-gray-600 hover:bg-gray-100 active:bg-gray-200 transition-colors select-none"
+              >
+                −
+              </button>
+              <span className="w-12 text-center text-lg font-semibold text-gray-800 tabular-nums select-none">
+                {value}
+              </span>
+              <button
+                type="button"
+                onClick={() => set((v) => Number(v) + 1)}
+                className="px-4 py-2.5 text-lg font-bold text-gray-600 hover:bg-gray-100 active:bg-gray-200 transition-colors select-none"
+              >
+                +
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
 
       {error && (
@@ -278,7 +283,7 @@ export default function CreateMatchForm({ groupId, onMatchCreated }) {
           disabled={submitting}
           className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl bg-pickle-green hover:opacity-90 disabled:opacity-50 transition-opacity"
         >
-          {submitting ? "Creating…" : "Create Match"}
+          {submitting ? "Saving…" : "🏓 Start Game"}
         </button>
       </div>
     </form>
