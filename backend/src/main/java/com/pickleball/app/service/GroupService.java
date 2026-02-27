@@ -3,26 +3,32 @@ package com.pickleball.app.service;
 import com.pickleball.app.dto.GroupMemberResponse;
 import com.pickleball.app.dto.GroupResponse;
 import com.pickleball.app.entity.Group;
+import com.pickleball.app.entity.Role;
 import com.pickleball.app.entity.User;
 import com.pickleball.app.repository.GroupRepository;
 import com.pickleball.app.repository.UserRepository;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class GroupService {
 
     private final GroupRepository groupRepository;
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public GroupService(GroupRepository groupRepository, UserRepository userRepository) {
+    public GroupService(GroupRepository groupRepository, UserRepository userRepository,
+                        PasswordEncoder passwordEncoder) {
         this.groupRepository = groupRepository;
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Transactional
@@ -60,6 +66,23 @@ public class GroupService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No registered user found with that email"));
         groupRepository.addMember(groupId, user.getId());
         return toMemberResponse(user);
+    }
+
+    /**
+     * Creates a lightweight guest account (Role.GUEST) with just a display name
+     * and adds them to the group. Guests have a synthetic email and can never log in.
+     */
+    @Transactional
+    public GroupMemberResponse addGuestMember(Long groupId, String displayName) {
+        if (!groupRepository.existsById(groupId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found");
+        }
+        String guestEmail = "guest_" + UUID.randomUUID().toString().replace("-", "") + "@pickleball.local";
+        User guest = new User(guestEmail, passwordEncoder.encode(UUID.randomUUID().toString()), Role.GUEST);
+        guest.setName(displayName.trim());
+        User saved = userRepository.save(guest);
+        groupRepository.addMember(groupId, saved.getId());
+        return toMemberResponse(saved);
     }
 
     @Transactional
@@ -101,6 +124,7 @@ public class GroupService {
     }
 
     private GroupMemberResponse toMemberResponse(User u) {
-        return new GroupMemberResponse(u.getId(), u.getEmail(), u.getName(), u.getPhotoUrl());
+        return new GroupMemberResponse(u.getId(), u.getEmail(), u.getName(), u.getPhotoUrl(),
+                u.getRole() == Role.GUEST);
     }
 }

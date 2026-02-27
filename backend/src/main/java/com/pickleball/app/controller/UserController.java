@@ -33,7 +33,8 @@ public class UserController {
             return ResponseEntity.ok(List.of());
         }
         List<GroupMemberResponse> results = userRepository.searchUsers(query.trim()).stream()
-                .map(u -> new GroupMemberResponse(u.getId(), u.getEmail(), u.getName(), u.getPhotoUrl()))
+                .filter(u -> u.getRole() != com.pickleball.app.entity.Role.GUEST)
+                .map(u -> new GroupMemberResponse(u.getId(), u.getEmail(), u.getName(), u.getPhotoUrl(), false))
                 .toList();
         return ResponseEntity.ok(results);
     }

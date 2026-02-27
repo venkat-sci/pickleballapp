@@ -1,5 +1,6 @@
 package com.pickleball.app.controller;
 
+import com.pickleball.app.dto.AddGuestMemberRequest;
 import com.pickleball.app.dto.AddGroupMemberRequest;
 import com.pickleball.app.dto.CreateGroupRequest;
 import com.pickleball.app.dto.GroupMemberResponse;
@@ -56,6 +57,18 @@ public class GroupController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Member email is required");
         }
         return ResponseEntity.ok(groupService.addMemberByEmail(id, request.email()));
+    }
+
+    /** Add a guest player (name only — no registration required) to a group */
+    @PostMapping("/{id}/add-guest")
+    public ResponseEntity<GroupMemberResponse> addGuest(
+            @PathVariable Long id,
+            @RequestBody AddGuestMemberRequest request) {
+        if (request == null || request.displayName() == null || request.displayName().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Display name is required");
+        }
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(groupService.addGuestMember(id, request.displayName()));
     }
 
     @DeleteMapping("/{groupId}/members/{userId}")

@@ -40,6 +40,10 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
+                        // Public session endpoints — join / view session without logging in
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/sessions/*").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/sessions/*/participants").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/sessions/*/join").permitAll()
                         .requestMatchers("/api/**").authenticated()
                 )
                 .sessionManagement(session ->
