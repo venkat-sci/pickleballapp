@@ -1,12 +1,15 @@
 package com.pickleball.app.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "users")
@@ -20,6 +23,7 @@ public class User implements UserDetails {
     private String email;
 
     @Column(nullable = false)
+    @JsonIgnore
     private String password;
 
     @Enumerated(EnumType.STRING)
@@ -32,6 +36,10 @@ public class User implements UserDetails {
     @Column(name = "photo_url")
     private String photoUrl;
 
+    @ManyToMany(mappedBy = "members")
+    @JsonIgnore
+    private Set<Group> groups = new HashSet<>();
+
     public User() {}
 
     public User(String email, String password, Role role) {
@@ -43,6 +51,7 @@ public class User implements UserDetails {
     // ── UserDetails ───────────────────────────────────────────────────────────
 
     @Override
+    @JsonIgnore
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
     }
@@ -71,4 +80,6 @@ public class User implements UserDetails {
     public void setName(String name)          { this.name = name; }
     public String getPhotoUrl()               { return photoUrl; }
     public void setPhotoUrl(String photoUrl)  { this.photoUrl = photoUrl; }
+    public Set<Group> getGroups()             { return groups; }
+    public void setGroups(Set<Group> groups)  { this.groups = groups; }
 }

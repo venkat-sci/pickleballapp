@@ -1,21 +1,21 @@
 package com.pickleball.app.controller;
 
 import com.pickleball.app.dto.ChangePasswordRequest;
+import com.pickleball.app.dto.GroupMemberResponse;
 import com.pickleball.app.dto.UpdateProfileRequest;
 import com.pickleball.app.dto.UserProfileResponse;
 import com.pickleball.app.entity.User;
 import com.pickleball.app.repository.UserRepository;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/user")
-@PreAuthorize("isAuthenticated()")
 public class UserController {
 
     private final UserRepository userRepository;
@@ -24,6 +24,18 @@ public class UserController {
     public UserController(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+    }
+
+    /** GET /api/user/search?query= — search all registered users by name or email */
+    @GetMapping("/search")
+    public ResponseEntity<List<GroupMemberResponse>> searchUsers(@RequestParam String query) {
+        if (query == null || query.isBlank() || query.length() < 2) {
+            return ResponseEntity.ok(List.of());
+        }
+        List<GroupMemberResponse> results = userRepository.searchUsers(query.trim()).stream()
+                .map(u -> new GroupMemberResponse(u.getId(), u.getEmail(), u.getName(), u.getPhotoUrl()))
+                .toList();
+        return ResponseEntity.ok(results);
     }
 
     /** GET /api/user/profile — return the current user's profile */

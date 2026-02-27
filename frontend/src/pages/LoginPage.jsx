@@ -19,6 +19,7 @@ export default function LoginPage() {
       const { data } = await api.post("/api/auth/login", form);
       localStorage.setItem("token", data.token);
       localStorage.setItem("email", data.email);
+      localStorage.setItem("userId", String(data.id));
       navigate("/dashboard");
     } catch (err) {
       setError(err.response?.data?.message ?? "Invalid email or password.");

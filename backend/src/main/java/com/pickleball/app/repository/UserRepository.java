@@ -2,10 +2,21 @@ package com.pickleball.app.repository;
 
 import com.pickleball.app.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
     boolean existsByEmail(String email);
+
+    @Query("""
+        select u from User u
+        where lower(coalesce(u.name,'')) like lower(concat('%', :query, '%'))
+           or lower(u.email) like lower(concat('%', :query, '%'))
+        order by u.name asc
+        """)
+    List<User> searchUsers(@Param("query") String query);
 }
